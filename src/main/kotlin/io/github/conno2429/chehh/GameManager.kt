@@ -1,6 +1,8 @@
 package io.github.conno2429.chehh
 
 import io.github.conno2429.chehh.board.BoardManager
+import io.github.conno2429.chehh.board.BoardManager.board
+import io.github.conno2429.chehh.moves.MoveRecord
 import io.github.conno2429.chehh.pieces.PieceColor
 import io.github.conno2429.chehh.pieces.Position
 import kotlin.system.exitProcess
@@ -13,7 +15,9 @@ object GameManager {
     private lateinit var playerMode: PlayerMode
     private lateinit var playerOne: Player
     private lateinit var playerTwo: Player
-    private lateinit var moves: List<Position>
+    var lastMove: MoveRecord? = null
+    private var moves: MutableList<MoveRecord> = mutableListOf()
+    private var turns: Int = 1
 
     fun start() {
         println("Time to play Chehh!")
@@ -24,6 +28,7 @@ object GameManager {
 
         BoardManager.createBoard()
         BoardManager.setPieces(gameMode)
+        BoardManager.printWhite()
 
         gameLoop()
     }
@@ -34,7 +39,7 @@ object GameManager {
             when (readln()) {
                 "1" -> { gameMode = GameMode.STANDARD; return }
                 "2" -> { gameMode = GameMode.NINESIXTY; return }
-                "X" -> exitProcess(0)
+                "X", "x" -> exitProcess(0)
                 else -> println("Invalid input, try again")
             }
         }
@@ -46,7 +51,7 @@ object GameManager {
             when (readln()) {
                 "1" -> { playerMode = PlayerMode.ONE; return }
                 "2" -> { playerMode = PlayerMode.TWO; return }
-                "X" -> exitProcess(0)
+                "X", "x" -> exitProcess(0)
                 else -> println("Invalid input, try again")
             }
         }
@@ -57,7 +62,7 @@ object GameManager {
             PlayerMode.ONE -> {
                 println("Enter username: \nPress (X) to exit")
                 val nameInput = readln()
-                if (nameInput == "X") exitProcess(0)
+                if (nameInput.equals("X", ignoreCase = true)) exitProcess(0)
 
                 val color = selectColor()
                 playerOne = Player(nameInput, color)
@@ -66,11 +71,11 @@ object GameManager {
             PlayerMode.TWO -> {
                 println("Player 1, enter username: \nPress (X) to exit")
                 val p1Input = readln()
-                if (p1Input == "X") exitProcess(0)
+                if (p1Input.equals("X", ignoreCase = true)) exitProcess(0)
 
                 println("Player 2, enter username: \nPress (X) to exit")
                 val p2Input = readln()
-                if (p2Input == "X") exitProcess(0)
+                if (p2Input.equals("X", ignoreCase = true)) exitProcess(0)
 
                 val color = selectColor()
                 playerOne = Player(p1Input, color)
@@ -86,13 +91,17 @@ object GameManager {
                 "White", "W", "w" -> return PieceColor.WHITE
                 "Black", "B", "b" -> return PieceColor.BLACK
                 "Random", "R", "r" -> return PieceColor.entries.random()
-                "X" -> exitProcess(0)
+                "X", "x" -> exitProcess(0)
                 else -> println("Invalid input, try again")
             }
         }
     }
 
     fun selectMove() {
+
+    }
+
+    fun selectMoveAI() {
 
     }
 

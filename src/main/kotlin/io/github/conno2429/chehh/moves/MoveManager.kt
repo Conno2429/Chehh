@@ -1,5 +1,6 @@
-package io.github.conno2429.chehh.rules
+package io.github.conno2429.chehh.moves
 
+import io.github.conno2429.chehh.GameManager
 import io.github.conno2429.chehh.board.Board
 import io.github.conno2429.chehh.board.clone
 import io.github.conno2429.chehh.pieces.Bishop
@@ -8,6 +9,7 @@ import io.github.conno2429.chehh.pieces.Knight
 import io.github.conno2429.chehh.pieces.Pawn
 import io.github.conno2429.chehh.pieces.Piece
 import io.github.conno2429.chehh.pieces.PieceColor
+import io.github.conno2429.chehh.pieces.PlaceHolder
 import io.github.conno2429.chehh.pieces.Position
 import io.github.conno2429.chehh.pieces.Queen
 import io.github.conno2429.chehh.pieces.Rook
@@ -26,6 +28,7 @@ object MoveManager {
             is Bishop -> bishopMoves(piece, board)
             is Queen -> queenMoves(piece, board)
             is King -> kingMoves(piece, board)
+            is PlaceHolder -> listOf()
         }
 
         return raw.filter { !leavesKingInCheck(piece, board) }
@@ -34,6 +37,7 @@ object MoveManager {
     private fun pawnMoves(piece: Piece, board: Board): List<Position> {
         val moves = mutableListOf<Position>()
         val position = piece.position
+        val last = GameManager.lastMove
 
         when (piece.color) {
             PieceColor.WHITE -> {
@@ -61,10 +65,14 @@ object MoveManager {
 
                 // en passant
                 if (piece.position.rank == 4) {
-                    // TODO: add last turn pawn move condition to its sides
+                    if (last != null && last.piece is Pawn &&
+                        abs(last.from.rank - last.to.rank) == 2 &&
+                        abs(last.to.file - position.file) == 1 &&
+                        last.to.rank == position.rank) {
+                        // add the en passant capture square
+                        moves.add(Position(position.rank + 1, last.to.file))
+                    }
                 }
-
-                // potential promotion logic, decide where to handle later
             }
             PieceColor.BLACK -> {
                 // straight line
@@ -91,10 +99,14 @@ object MoveManager {
 
                 // en passant
                 if (piece.position.rank == 3) {
-                    // TODO: add last turn pawn move condition to its sides
+                    if (last != null && last.piece is Pawn &&
+                        abs(last.from.rank - last.to.rank) == 2 &&
+                        abs(last.to.file - position.file) == 1 &&
+                        last.to.rank == position.rank) {
+                        // add the en passant capture square
+                        moves.add(Position(position.rank - 1, last.to.file))
+                    }
                 }
-
-                // potential promotion logic, decide where to handle later
             }
         }
 
@@ -134,7 +146,7 @@ object MoveManager {
         return rookMoves(piece, board) + bishopMoves(piece, board)
     }
 
-    fun kingMoves(piece: Piece, board: Board): List<Position> {
+    fun kingMoves(piece: King, board: Board): List<Position> {
         val (rank, file) = piece.position
         val candidates = listOf(
             Position(rank + 1, file),
@@ -153,7 +165,7 @@ object MoveManager {
             inBounds(it, board)
                     && !friendlyAt(it, piece.color, board)
                     && (enemyKingPos == null || !isAdjacent(it, enemyKingPos))
-        }
+        } + addCastle(piece, board)
     }
 
     private fun slidingMoves(piece: Piece, board: Board, directions: List<Pair<Int, Int>>): List<Position> {
@@ -176,7 +188,53 @@ object MoveManager {
         return moves
     }
 
-    private fun isInCheck(king: King, board: Board): Boolean {
+    private fun addCastle(king: King, board: Board): List<Position> {
+        val castleMoves = mutableListOf<Position>()
+        if (king.hasMoved || isInCheck(king, board)) return castleMoves
+
+        // kingside
+        val kingsideRook = findCastleRook(king, true, board)
+        if (kingsideRook != null && !kingsideRook.hasMoved) {
+            if (castlePathClear(king, kingsideRook, board) &&
+                castlePathSafe(king, true, board)) {
+                castleMoves.add(Position(king.position.rank, 6))
+            }
+        }
+
+        // queenside
+        val queensideRook = findCastleRook(king, false, board)
+        if (queensideRook != null && !queensideRook.hasMoved) {
+            if (castlePathClear(king, queensideRook, board) &&
+                castlePathSafe(king, false, board)) {
+                castleMoves.add(Position(king.position.rank, 2))
+            }
+        }
+
+        return castleMoves
+    }
+
+    private fun castlePathClear(king: King, rook: Rook, board: Board): Boolean {
+        val rank = king.position.rank
+        val from = minOf(king.position.file, rook.position.file) + 1
+        val to = maxOf(king.position.file, rook.position.file)
+        for (file in from until to) {
+            val occupant = board.grid[rank][file]?.pieceOn
+            if (occupant != null && occupant != king && occupant != rook) return false
+        }
+        return true
+    }
+
+    private fun castlePathSafe(king: King, kingSide: Boolean, board: Board): Boolean {
+        val rank = king.position.rank
+        val files = if (kingSide) king.position.file..6 else 2..king.position.file
+        for (file in files) {
+            val placeholder = PlaceHolder(king.color, Position(rank, file))
+            if (isInCheck(placeholder, board)) return false
+        }
+        return true
+    }
+
+    private fun isInCheck(king: Piece, board: Board): Boolean {
         val (rank, file) = king.position
         val enemyColor = if (king.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
 
@@ -227,6 +285,17 @@ object MoveManager {
                 val piece = board.grid[rank][file]?.pieceOn
                 if (piece is King && piece.color == enemyColor) return piece
             }
+        }
+        return null
+    }
+
+    private fun findCastleRook(king: Piece, kingSide: Boolean, board: Board): Rook? {
+        val rank = king.position.rank
+        val range = if (kingSide) (king.position.file + 1) until board.width
+        else 0 until king.position.file
+        for (file in range) {
+            val piece = board.grid[rank][file]?.pieceOn
+            if (piece is Rook && piece.color == king.color) return piece
         }
         return null
     }

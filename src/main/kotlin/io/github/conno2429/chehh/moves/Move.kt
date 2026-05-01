@@ -1,4 +1,4 @@
-package io.github.conno2429.chehh.rules
+package io.github.conno2429.chehh.moves
 
 import io.github.conno2429.chehh.pieces.Piece
 import io.github.conno2429.chehh.pieces.Position
