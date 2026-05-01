@@ -1,9 +1,12 @@
 package io.github.conno2429.chehh.board
 
+import io.github.conno2429.chehh.pieces.Piece
+
+enum class SquareColor { LIGHT, DARK }
+
 data class Square(
-    var isOccupied: Boolean = false,
-    var pieceOn: Any? = null,
-    var color: String? = null,
-    var row: Int = 0,
-    var column: Int = 0
+    var pieceOn: Piece? = null,
+    var color: SquareColor,
+    var rank: Int = 0,
+    var file: Int = 0
 )
