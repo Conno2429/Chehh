@@ -30,7 +30,6 @@ object BoardManager {
             }
         }
 
-        setPieces(GameMode.STANDARD)
         board.isActive = true
     }
 
@@ -87,13 +86,32 @@ object BoardManager {
         // TODO: moves a piece based on user input
     }
 
-    fun printBoard() {
+    fun printWhite() {
         if (!board.isActive) {
             createBoard()
         }
 
         for (rank in board.height - 1 downTo 0) {
             for (file in 0 until board.width) {
+                val square = board.grid[rank][file]!!
+                val piece = square.pieceOn
+                if (piece != null) {
+                    print("${piece.symbol} ")
+                } else {
+                    print(" ")
+                }
+            }
+            println()
+        }
+    }
+
+    fun printBlack() {
+        if (!board.isActive) {
+            createBoard()
+        }
+
+        for (rank in 0 until board.height) {
+            for (file in board.width - 1 downTo 0) {
                 val square = board.grid[rank][file]!!
                 val piece = square.pieceOn
                 if (piece != null) {
