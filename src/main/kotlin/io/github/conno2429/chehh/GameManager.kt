@@ -1,118 +1,77 @@
 package io.github.conno2429.chehh
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import io.github.conno2429.chehh.board.BoardManager
 import io.github.conno2429.chehh.board.BoardManager.board
+import io.github.conno2429.chehh.moves.MoveManager
 import io.github.conno2429.chehh.moves.MoveRecord
 import io.github.conno2429.chehh.pieces.PieceColor
 import io.github.conno2429.chehh.pieces.Position
-import kotlin.system.exitProcess
 
 enum class GameMode { STANDARD, NINESIXTY }
 enum class PlayerMode { ONE, TWO }
 
 object GameManager {
-    private lateinit var gameMode: GameMode
-    private lateinit var playerMode: PlayerMode
-    private lateinit var playerOne: Player
-    private lateinit var playerTwo: Player
+    var gameMode by mutableStateOf<GameMode?>(null)
+        private set
+    var playerMode by mutableStateOf<PlayerMode?>(null)
+        private set
+    var playerOne by mutableStateOf<Player?>(null)
+        private set
+    var playerTwo by mutableStateOf<Player?>(null)
+        private set
+    var currentTurn by mutableStateOf(PieceColor.WHITE)
+        private set
+    var gameOverMessage by mutableStateOf<String?>(null)
+        private set
     var lastMove: MoveRecord? = null
-    private var moves: MutableList<MoveRecord> = mutableListOf()
-    private var turns: Int = 1
+    var moves = mutableStateListOf<MoveRecord>()
+    var turns: Int = 1
+    var gameStarted by mutableStateOf(false)
+        private set
 
-    fun start() {
-        println("Time to play Chehh!")
+    fun updateGameMode(mode: GameMode) { gameMode = mode }
+    fun updatePlayerMode(mode: PlayerMode) { playerMode = mode }
+    fun updatePlayers(p1: Player, p2: Player) { playerOne = p1; playerTwo = p2 }
 
-        selectGameMode()
-        selectPlayerMode()
-        enterName()
-
+    fun startGame() {
         BoardManager.createBoard()
-        BoardManager.setPieces(gameMode)
-        BoardManager.printWhite()
-
-        gameLoop()
+        BoardManager.setPieces(gameMode!!)
+        gameStarted = true
     }
 
-    fun selectGameMode() {
-        while (true) {
-            println("Select game mode: 1) Standard  2) Chess960 \nPress (X) to exit")
-            when (readln()) {
-                "1" -> { gameMode = GameMode.STANDARD; return }
-                "2" -> { gameMode = GameMode.NINESIXTY; return }
-                "X", "x" -> exitProcess(0)
-                else -> println("Invalid input, try again")
+    fun nextTurn() {
+        currentTurn = if (currentTurn == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+        turns++
+    }
+
+    fun onMoveMade(from: Position, to: Position) {
+        val nextColor = if (currentTurn == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+
+        when {
+            MoveManager.isCheckmate(nextColor, board) -> endGame("Checkmate! ${currentTurn.name} wins!")
+            MoveManager.isStalemate(nextColor, board) -> endGame("Stalemate! Draw!")
+            MoveManager.isInCheck(nextColor, board) -> {
+                nextTurn()
+                // TODO: show check indicator in UI
             }
+            else -> nextTurn()
         }
     }
 
-    fun selectPlayerMode() {
-        while (true) {
-            println("Select player mode: 1) One player  2) Two player \nPress (X) to exit")
-            when (readln()) {
-                "1" -> { playerMode = PlayerMode.ONE; return }
-                "2" -> { playerMode = PlayerMode.TWO; return }
-                "X", "x" -> exitProcess(0)
-                else -> println("Invalid input, try again")
-            }
-        }
+    fun endGame(message: String) {
+        gameOverMessage = message
     }
 
-    fun enterName() {
-        when (playerMode) {
-            PlayerMode.ONE -> {
-                println("Enter username: \nPress (X) to exit")
-                val nameInput = readln()
-                if (nameInput.equals("X", ignoreCase = true)) exitProcess(0)
-
-                val color = selectColor()
-                playerOne = Player(nameInput, color)
-                playerTwo = Player("Chehh Master", if (color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE)
-            }
-            PlayerMode.TWO -> {
-                println("Player 1, enter username: \nPress (X) to exit")
-                val p1Input = readln()
-                if (p1Input.equals("X", ignoreCase = true)) exitProcess(0)
-
-                println("Player 2, enter username: \nPress (X) to exit")
-                val p2Input = readln()
-                if (p2Input.equals("X", ignoreCase = true)) exitProcess(0)
-
-                val color = selectColor()
-                playerOne = Player(p1Input, color)
-                playerTwo = Player(p2Input, if (color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE)
-            }
-        }
-    }
-
-    private fun selectColor(): PieceColor {
-        while (true) {
-            println("Select Color: White (W), Black (B), or Random (R) \nPress (X) to exit")
-            when (readln()) {
-                "White", "W", "w" -> return PieceColor.WHITE
-                "Black", "B", "b" -> return PieceColor.BLACK
-                "Random", "R", "r" -> return PieceColor.entries.random()
-                "X", "x" -> exitProcess(0)
-                else -> println("Invalid input, try again")
-            }
-        }
-    }
-
-    fun selectMove() {
-
-    }
-
-    fun selectMoveAI() {
-
-    }
-
-    private fun gameLoop() {
-        when (playerMode) {
-            PlayerMode.ONE -> {
-
-            }
-            PlayerMode.TWO -> {
-
-            }
-        }
+    fun resetGame() {
+        gameOverMessage = null
+        currentTurn = PieceColor.WHITE
+        turns = 1
+        moves.clear()
+        lastMove = null
+        gameStarted = false
     }
 }

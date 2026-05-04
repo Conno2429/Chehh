@@ -20,6 +20,10 @@ object MoveManager {
         return true
     }
 
+    fun getValidMoves(piece: Piece, board: Board): List<Position> {
+        return generateMoves(piece, board)
+    }
+
     private fun generateMoves(piece: Piece, board: Board): List<Position> {
         val raw = when (piece) {
             is Pawn -> pawnMoves(piece, board)
@@ -31,7 +35,7 @@ object MoveManager {
             is PlaceHolder -> listOf()
         }
 
-        return raw.filter { !leavesKingInCheck(piece, board) }
+        return raw.filter { !leavesKingInCheck(piece, it, board) }
     }
 
     private fun pawnMoves(piece: Piece, board: Board): List<Position> {
@@ -159,12 +163,22 @@ object MoveManager {
             Position(rank - 1, file - 1),
         )
 
-        val enemyKingPos = findKing(piece.color, board)?.position
+        val enemyColor = if (piece.color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
+        val enemyKingPos = findKing(enemyColor, board)?.position
+
+        candidates.forEach {
+            if (!inBounds(it, board)) println("$it filtered: out of bounds")
+            else if (friendlyAt(it, piece.color, board)) println("$it filtered: friendly piece")
+            else if (enemyKingPos != null && isAdjacent(it, enemyKingPos)) println("$it filtered: adjacent to enemy king")
+            else if (leavesKingInCheck(piece, it, board)) println("$it filtered: leaves king in check")
+            else println("$it ALLOWED")
+        }
 
         return candidates.filter {
             inBounds(it, board)
                     && !friendlyAt(it, piece.color, board)
                     && (enemyKingPos == null || !isAdjacent(it, enemyKingPos))
+                    && !leavesKingInCheck(piece, it, board)
         } + addCastle(piece, board)
     }
 
@@ -260,18 +274,59 @@ object MoveManager {
         val pawnRank = if (king.color == PieceColor.WHITE) rank + 1 else rank - 1
         for (dFile in listOf(-1, 1)) {
             val diag = Position(pawnRank, file + dFile)
+            if (!inBounds(diag, board)) continue
             val piece = board.grid[diag.rank][diag.file]?.pieceOn
-            if (inBounds(diag, board) && piece?.color == enemyColor && piece is Pawn) return true
+            if (piece?.color == enemyColor && piece is Pawn) return true
         }
 
         return false
     }
 
-    private fun leavesKingInCheck(piece: Piece, board: Board): Boolean {
-        val cloneBoard = board.clone()
-        cloneBoard.grid[piece.position.rank][piece.position.file]?.pieceOn = null
-        val king = findKing(piece.color, cloneBoard) ?: return false
-        return isInCheck(king, cloneBoard)
+    fun isInCheck(color: PieceColor, board: Board): Boolean {
+        val king = findKing(color, board) ?: return false
+        return isInCheck(king, board)
+    }
+
+    fun isCheckmate(color: PieceColor, board: Board): Boolean {
+        if (!isInCheck(color, board)) return false
+        for (rank in 0 until board.height) {
+            for (file in 0 until board.width) {
+                val piece = board.grid[rank][file]?.pieceOn ?: continue
+                if (piece.color != color) continue
+                val moves = generateMoves(piece, board)
+                println("$piece at ${piece.position} has ${moves.size} moves: $moves")
+                if (moves.isNotEmpty()) return false
+            }
+        }
+        return true
+    }
+
+    fun isStalemate(color: PieceColor, board: Board): Boolean {
+        if (isInCheck(color, board)) return false
+        for (rank in 0 until board.height) {
+            for (file in 0 until board.width) {
+                val piece = board.grid[rank][file]?.pieceOn ?: continue
+                if (piece.color != color) continue
+                if (generateMoves(piece, board).isNotEmpty()) return false
+            }
+        }
+        return true
+    }
+
+    private fun leavesKingInCheck(piece: Piece, target: Position, board: Board): Boolean {
+        val simBoard = board.clone()
+        val simPiece = simBoard.grid[piece.position.rank][piece.position.file]?.pieceOn ?: return false
+        simBoard.grid[piece.position.rank][piece.position.file]?.pieceOn = null
+        simBoard.grid[target.rank][target.file]?.pieceOn = simPiece
+        simPiece.position = target
+
+        val king = if (piece is King) {
+            simBoard.grid[target.rank][target.file]?.pieceOn as? King ?: return true
+        } else {
+            findKing(piece.color, simBoard) ?: return true
+        }
+
+        return isInCheck(king, simBoard)
     }
 
     private fun isAdjacent(a: Position, b: Position): Boolean {
@@ -279,11 +334,10 @@ object MoveManager {
     }
 
     private fun findKing(color: PieceColor, board: Board): King? {
-        val enemyColor = if (color == PieceColor.WHITE) PieceColor.BLACK else PieceColor.WHITE
         for (rank in 0 until board.height) {
             for (file in 0 until board.width) {
                 val piece = board.grid[rank][file]?.pieceOn
-                if (piece is King && piece.color == enemyColor) return piece
+                if (piece is King && piece.color == color) return piece
             }
         }
         return null
@@ -315,5 +369,18 @@ object MoveManager {
     private fun enemyAt(position: Position, color: PieceColor, board: Board): Boolean {
         return board.grid[position.rank][position.file]?.pieceOn?.color != color
                 && pieceAt(position, board)
+    }
+
+    fun allLegalMoves(color: PieceColor, board: Board): Map<Piece, List<Position>> {
+        val result = mutableMapOf<Piece, List<Position>>()
+        for (rank in 0 until board.height) {
+            for (file in 0 until board.width) {
+                val piece = board.grid[rank][file]?.pieceOn ?: continue
+                if (piece.color != color) continue
+                val moves = generateMoves(piece, board)
+                if (moves.isNotEmpty()) result[piece] = moves
+            }
+        }
+        return result
     }
 }
